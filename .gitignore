@@ -1,0 +1,45 @@
+# ---------- .NET ----------
+**/bin/
+**/obj/
+*.user
+*.suo
+*.userprefs
+.vs/
+artifacts/
+*.dll
+*.pdb
+
+# Build / publish output
+publish/
+[Pp]ublish/
+
+# Rider / VS / VS Code
+.idea/
+*.sln.iml
+
+# ---------- App config / secrets ----------
+appsettings.Production.json
+.env
+*.env
+secrets.json
+
+# Logs
+logs/
+*.log
+
+# ---------- Node / Frontend ----------
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# npm / yarn / pnpm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---------- OS ----------
+.DS_Store
+Thumbs.db

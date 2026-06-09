@@ -1,0 +1,16 @@
+using FluentValidation;
+
+namespace AttendanceSystem.Application.Features.Attendance.Commands.ClockOut;
+
+public class ClockOutCommandValidator : AbstractValidator<ClockOutCommand>
+{
+    public ClockOutCommandValidator()
+    {
+        RuleFor(x => x.EmployeeId)
+            .NotEmpty().WithMessage("EmployeeId is required");
+
+        RuleFor(x => x.Notes)
+            .MaximumLength(500).WithMessage("Notes cannot exceed 500 characters")
+            .When(x => x.Notes != null);
+    }
+}
