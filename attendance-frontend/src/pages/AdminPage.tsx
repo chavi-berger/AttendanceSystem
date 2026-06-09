@@ -1,14 +1,11 @@
-import { AppHeader } from '../components/common/AppHeader';
+import { AppLayout } from '../components/common/AppLayout';
 import { AdminDashboard } from '../components/AdminDashboard/AdminDashboard';
 
 export function AdminPage() {
   return (
-    <div className="page">
-      <AppHeader />
-      <main className="page-content">
-        <AdminDashboard />
-      </main>
-    </div>
+    <AppLayout>
+      <AdminDashboard />
+    </AppLayout>
   );
 }
 

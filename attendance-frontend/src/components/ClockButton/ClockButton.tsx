@@ -30,48 +30,41 @@ export function ClockButton() {
 
   if (isLoading) {
     return (
-      <div className="clock-card">
+      <div className="clock-wrap">
         <LoadingSpinner size={28} label="Loading status…" />
       </div>
     );
   }
 
   return (
-    <div className="clock-card">
-      <div className="clock-now">
-        <span className="clock-now-label">Zurich time</span>
-        <span className="clock-now-value">
-          {now ? `${formatZurichDate(now.toISOString())} · ${formatZurichClock(now)}` : 'Fetching…'}
-        </span>
-      </div>
-
-      {isClockedIn ? (
-        <div className="clock-live">
-          <span className="clock-live-label">Clocked in since</span>
-          <span className="clock-live-time">{formatZurichTime(status?.clockInTime)} (Zurich)</span>
-          <span className="clock-live-duration">
-            {now ? formatElapsed(status?.clockInTime, now) : status?.durationSoFar ?? '—'}
-          </span>
-        </div>
-      ) : (
-        <p className="clock-idle">You are currently clocked out.</p>
-      )}
-
+    <div className="clock-wrap">
       <button
-        className={`btn btn-clock ${isClockedIn ? 'btn-clock-out' : 'btn-clock-in'}`}
+        className={`clock-circle${isClockedIn ? ' is-in' : ''}`}
         disabled={disabled}
         onClick={() => setConfirmOpen(true)}
       >
         {pending ? (
-          <LoadingSpinner size={20} />
+          <LoadingSpinner size={22} />
         ) : isClockedIn ? (
-          'Clock Out'
+          <>
+            <span className="clock-circle-label">Clock Out</span>
+            <span className="clock-circle-duration">{now ? formatElapsed(status?.clockInTime, now) : status?.durationSoFar ?? '—'}</span>
+            <span className="clock-circle-sub">since {formatZurichTime(status?.clockInTime)}</span>
+          </>
         ) : (
-          'Clock In'
+          <>
+            <span className="clock-circle-label">Clock In</span>
+            <span className="clock-circle-sub">{now ? formatZurichClock(now) : 'Fetching…'}</span>
+          </>
         )}
       </button>
 
-      {!isOnline && <p className="clock-offline-hint">Clock actions are disabled while offline.</p>}
+      <div className="clock-now-line">
+        Zurich time:{' '}
+        <b>{now ? `${formatZurichDate(now.toISOString())} · ${formatZurichClock(now)}` : 'Fetching…'}</b>
+      </div>
+
+      {!isOnline && <span className="clock-offline-hint">Clock actions are disabled while offline.</span>}
 
       <ConfirmDialog
         open={confirmOpen}

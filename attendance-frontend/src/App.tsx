@@ -4,8 +4,10 @@ import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { NetworkStatus } from './components/common/NetworkStatus';
 import { Toaster } from './components/common/Toaster';
 import { LoginPage } from './pages/LoginPage';
-import { EmployeePage } from './pages/EmployeePage';
+import { DashboardPage } from './pages/DashboardPage';
+import { HistoryPage } from './pages/HistoryPage';
 import { AdminPage } from './pages/AdminPage';
+import { UserManagementPage } from './pages/UserManagementPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,7 +27,15 @@ function App() {
             path="/"
             element={
               <ProtectedRoute>
-                <EmployeePage />
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/history"
+            element={
+              <ProtectedRoute>
+                <HistoryPage />
               </ProtectedRoute>
             }
           />
@@ -34,6 +44,14 @@ function App() {
             element={
               <ProtectedRoute roles={['Admin', 'Manager']}>
                 <AdminPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute roles={['Admin']}>
+                <UserManagementPage />
               </ProtectedRoute>
             }
           />

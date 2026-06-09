@@ -32,6 +32,18 @@ public class EmployeeRepository : IEmployeeRepository
             .OrderBy(e => e.FullName)
             .ToListAsync(ct); // global query filter already restricts to IsActive == true
 
+    public async Task<IEnumerable<Employee>> GetAllAsync(CancellationToken ct = default) =>
+        await _context.Employees
+            .IgnoreQueryFilters() // include deactivated employees for admin management
+            .AsNoTracking()
+            .OrderBy(e => e.FullName)
+            .ToListAsync(ct);
+
+    public Task<Employee?> GetByIdForUpdateAsync(Guid id, CancellationToken ct = default) =>
+        _context.Employees
+            .IgnoreQueryFilters() // allow loading a deactivated employee (e.g. to reactivate)
+            .FirstOrDefaultAsync(e => e.Id == id, ct);
+
     public async Task AddAsync(Employee employee, CancellationToken ct = default) =>
         await _context.Employees.AddAsync(employee, ct);
 

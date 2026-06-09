@@ -9,11 +9,12 @@ import { HistoryRow } from './HistoryRow';
 
 interface AttendanceHistoryProps {
   employeeId?: string; // omit => current employee
+  title?: string;
 }
 
 const PAGE_SIZE = 10;
 
-export function AttendanceHistory({ employeeId }: AttendanceHistoryProps) {
+export function AttendanceHistory({ employeeId, title = 'Attendance History' }: AttendanceHistoryProps) {
   const [page, setPage] = useState(1);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -41,19 +42,19 @@ export function AttendanceHistory({ employeeId }: AttendanceHistoryProps) {
   };
 
   return (
-    <section className="history">
-      <div className="history-header">
-        <h2>Attendance History</h2>
+    <section className="panel">
+      <div className="panel-header">
+        <h2>{title}</h2>
         <div className="history-filters">
-          <label>
-            From
+          <div className="field">
+            <span className="field-label">From</span>
             <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} />
-          </label>
-          <label>
-            To
+          </div>
+          <div className="field">
+            <span className="field-label">To</span>
             <input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} />
-          </label>
-          <button className="btn btn-secondary" onClick={exportCsv} disabled={items.length === 0}>
+          </div>
+          <button className="btn btn-ghost" onClick={exportCsv} disabled={items.length === 0}>
             Export CSV
           </button>
         </div>
@@ -87,7 +88,7 @@ export function AttendanceHistory({ employeeId }: AttendanceHistoryProps) {
 
           <div className="pagination">
             <button
-              className="btn btn-secondary"
+              className="btn btn-ghost btn-sm"
               disabled={!result?.hasPreviousPage}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
             >
@@ -97,7 +98,7 @@ export function AttendanceHistory({ employeeId }: AttendanceHistoryProps) {
               Page {result?.page ?? page} of {result?.totalPages ?? 1}
             </span>
             <button
-              className="btn btn-secondary"
+              className="btn btn-ghost btn-sm"
               disabled={!result?.hasNextPage}
               onClick={() => setPage((p) => p + 1)}
             >

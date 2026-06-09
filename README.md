@@ -1,164 +1,155 @@
 # Attendance System
 
-Employee Attendance **Clock-In / Clock-Out** system built with Clean Architecture.
+A production-grade employee clock-in/clock-out system built with ASP.NET Core 8 and React 18.
 
-The authoritative clock time **always** comes from an external Europe/Zurich time API — never
-from the server or browser clock. If that time source is unavailable, clock operations fail
-loudly (HTTP 503) rather than silently recording an unverified time.
+The authoritative clock time **always** comes from an external Europe/Zurich time API — never from
+the server or browser clock. If that source is unavailable, clock operations fail loudly (HTTP 503)
+rather than silently recording an unverified time.
 
-## Architecture (4 layers)
+## Architecture
+
+Clean Architecture with four layers; source dependencies point **inward** toward a
+dependency-free Domain.
 
 ```
-AttendanceSystem/
-├─ AttendanceSystem.Domain          # Entities, value objects, domain exceptions (zero dependencies)
-├─ AttendanceSystem.Application     # CQRS commands/queries (MediatR), interfaces, behaviors, validators
-├─ AttendanceSystem.Infrastructure  # EF Core, repositories, Unit of Work, time service, background jobs
-├─ AttendanceSystem.Api             # Controllers, JWT, middleware, rate limiting, health checks, DI root
-├─ AttendanceSystem.UnitTests       # xUnit + Moq + FluentAssertions
-├─ AttendanceSystem.IntegrationTests# WebApplicationFactory end-to-end (SQL Server / Testcontainers)
-├─ attendance-frontend              # React + Vite + TypeScript
-└─ docker-compose.yml               # SQL Server 2022
+┌──────────────────────────────────────────────────────────────┐
+│  Api            controllers, JWT, middleware, rate limiting    │
+│  ┌──────────────────────────────────────────────────────────┐ │
+│  │  Infrastructure   EF Core, time client, Polly, jobs        │ │
+│  │  ┌──────────────────────────────────────────────────────┐ │ │
+│  │  │  Application    CQRS commands/queries, interfaces       │ │ │
+│  │  │  ┌──────────────────────────────────────────────────┐ │ │ │
+│  │  │  │  Domain   entities, value objects (no deps)        │ │ │ │
+│  │  │  └──────────────────────────────────────────────────┘ │ │ │
+│  │  └──────────────────────────────────────────────────────┘ │ │
+│  └──────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────┘
+   Api → Application, Infrastructure   ·   Infrastructure → Application   ·   Application → Domain
 ```
 
-**Dependency rule:** `Api → Application, Infrastructure`; `Infrastructure → Application`;
-`Application → Domain`. The Domain layer references nothing but the framework.
+The frontend (React + Vite + TypeScript) is a separate SPA that talks to the API over HTTP.
+A full deep-dive lives in [`PROJECT_EXPLAINED.md`](./PROJECT_EXPLAINED.md).
 
-| Layer       | Technology                                                       |
-|-------------|------------------------------------------------------------------|
-| Backend     | ASP.NET Core 8 Web API (targets `net8.0`)                        |
-| Frontend    | React (Vite + TypeScript), TanStack Query, Zustand               |
-| Database    | Microsoft SQL Server 2022 (Docker) / LocalDB for local dev       |
-| ORM         | Entity Framework Core 8                                          |
-| Patterns    | Clean Architecture, CQRS (MediatR), FluentValidation             |
-| Resilience  | Polly (retry → circuit breaker → timeout) on the time API client |
-| Logging     | Serilog (Console + rolling File)                                 |
-| Auth        | JWT Bearer (15-min access token + rotating 7-day refresh token)  |
-| Testing     | xUnit, Moq, FluentAssertions, Testcontainers / LocalDB           |
+## Tech Stack
+
+| Layer        | Technology                              | Purpose                                              |
+|--------------|-----------------------------------------|------------------------------------------------------|
+| Backend      | ASP.NET Core 8 Web API (`net8.0`)       | HTTP API, hosting, DI, middleware                    |
+| Frontend     | React 18 + Vite + TypeScript            | Single-page application                              |
+| Database     | SQL Server 2022 (Docker) / LocalDB      | Persistence                                          |
+| ORM          | Entity Framework Core 8                 | Mapping, migrations, parameterized SQL               |
+| CQRS         | MediatR                                 | Command/query dispatch + pipeline behaviors          |
+| Validation   | FluentValidation                        | Request validation (in a MediatR behavior)           |
+| Resilience   | Polly                                   | Retry → circuit breaker → timeout on the time API    |
+| Auth         | JWT Bearer + BCrypt                      | Stateless auth, hashed passwords, refresh rotation   |
+| Logging      | Serilog                                 | Structured console + rolling file logs               |
+| Server state | TanStack React Query                    | Caching, refetch, cache invalidation                 |
+| Client state | Zustand                                 | In-memory auth tokens (XSS-resistant)                |
+| Tests        | xUnit, Moq, FluentAssertions, Testcontainers | Unit + end-to-end integration                  |
 
 ## Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 - [Node.js 18+](https://nodejs.org/) (Node 22 verified)
-- For the database, **either**:
-  - [Docker](https://www.docker.com/) (runs SQL Server 2022 via `docker-compose`), **or**
-  - SQL Server **LocalDB** (ships with Visual Studio / SQL Server Express) for a Docker-free local run.
+- A SQL Server — **either** [Docker](https://www.docker.com/) (SQL Server 2022 via compose)
+  **or** SQL Server **LocalDB** (Visual Studio / SQL Server Express) for a Docker-free run.
 
-## Setup
-
-### Option A — Docker (matches production config)
+## Quick Start
 
 ```bash
-docker-compose up -d          # SQL Server 2022 on localhost,1433
-docker ps                     # confirm attendance_sqlserver is healthy
+# 1. Database (Docker)
+docker-compose up -d                       # SQL Server 2022 on localhost,1433
+#    …or skip Docker: Development config already points at (localdb)\MSSQLLocalDB
+
+# 2. API  (migrates + seeds on startup; Swagger at /swagger in Development)
 dotnet run --project AttendanceSystem.Api
-```
+#    If only the .NET 9 SDK is installed (no .NET 8 runtime):
+#    DOTNET_ROLL_FORWARD=Major dotnet run --project AttendanceSystem.Api --no-launch-profile
 
-Uses the connection string in `appsettings.json` (`Server=localhost,1433; … User Id=sa …`).
-
-### Option B — LocalDB (no Docker)
-
-`appsettings.Development.json` already points `DefaultConnection` at
-`(localdb)\MSSQLLocalDB`, so in the Development environment you can simply:
-
-```bash
-dotnet run --project AttendanceSystem.Api      # migrates + seeds LocalDB automatically
-```
-
-> The API applies pending EF Core migrations and seeds 3 users on startup. Seed accounts
-> (password `Test@1234`): `anna@company.ch` (Employee), `hans@company.ch` (Manager),
-> `admin@company.ch` (Admin).
-
-### Frontend
-
-```bash
+# 3. Frontend  (Vite dev server, http://localhost:5173 — set VITE_API_URL in attendance-frontend/.env)
 cd attendance-frontend
 npm install
-npm run dev                   # Vite dev server on http://localhost:5173 (CORS-allowed)
+npm run dev
 ```
 
-Set `VITE_API_URL` in `attendance-frontend/.env` to point at the API (default `https://localhost:5001`).
+Seed accounts (password `Test@1234`): `anna@company.ch` (Employee), `hans@company.ch` (Manager),
+`admin@company.ch` (Admin).
 
 ## API Endpoints
 
-| Method | Route                              | Auth            | Description                                        |
-|--------|------------------------------------|-----------------|----------------------------------------------------|
-| POST   | `/api/auth/login`                  | anonymous       | Email/password → access + refresh tokens           |
-| POST   | `/api/auth/refresh`                | anonymous       | Rotate refresh token → new token pair              |
-| POST   | `/api/auth/logout`                 | authenticated   | Clears the stored refresh token                    |
-| POST   | `/api/attendance/clock-in`         | authenticated†  | Clock in (official Zurich time); 409 if open       |
-| POST   | `/api/attendance/clock-out`        | authenticated†  | Clock out; 400 if not clocked in                   |
-| GET    | `/api/attendance/status`           | authenticated   | Current `{ isClockedIn, clockInTime, duration }`   |
-| GET    | `/api/attendance/history`          | authenticated   | Paged history; `?employeeId=` for Managers/Admins  |
-| GET    | `/api/attendance/active`           | Manager/Admin   | All currently open sessions                        |
-| PUT    | `/api/attendance/{logId}/correct`  | Admin           | Manual correction with full audit trail            |
-| GET    | `/health`, `/health/live`, `/health/ready` | anonymous | Health checks (JSON)                          |
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/auth/login` | anonymous | Email/password → access + refresh tokens |
+| POST | `/api/auth/refresh` | anonymous | Rotate refresh token → new token pair |
+| POST | `/api/auth/logout` | authenticated | Clear the stored refresh token |
+| POST | `/api/attendance/clock-in` | authenticated† | Clock in (official Zurich time); 409 if already in |
+| POST | `/api/attendance/clock-out` | authenticated† | Clock out; Manager/Admin may pass `{employeeId}` to force-clock-out another |
+| GET | `/api/attendance/status` | authenticated | Caller status + current Zurich time |
+| GET | `/api/attendance/history` | authenticated | Own history; Manager/Admin may pass `?employeeId=` |
+| GET | `/api/attendance/active` | Manager/Admin | All currently open sessions |
+| PUT | `/api/attendance/{logId}/correct` | Admin | Manual correction (audited) |
+| GET | `/api/employees` | Manager/Admin | List all employees (incl. inactive) |
+| POST | `/api/employees` | Admin | Create employee (409 on duplicate email/badge) |
+| PUT | `/api/employees/{id}/role` | Admin | Change role |
+| PUT | `/api/employees/{id}/deactivate` | Admin | Soft-delete (IsActive = false) |
+| PUT | `/api/employees/{id}/activate` | Admin | Reactivate |
+| GET | `/health`, `/health/live`, `/health/ready` | anonymous | Health checks (JSON) |
 
 † `clock-in` / `clock-out` are rate-limited to **5 requests/minute per user** (429 beyond that).
 
-## Environment Variables / Configuration
+## Roles & Permissions
 
-| Key                                   | Purpose                                                        |
-|---------------------------------------|----------------------------------------------------------------|
-| `ConnectionStrings:DefaultConnection` | SQL Server connection string                                   |
-| `Jwt:Secret`                          | 32+ char HMAC signing key (set via user-secrets in prod)       |
-| `Jwt:Issuer` / `Jwt:Audience`         | Token issuer / audience                                        |
-| `Jwt:AccessTokenExpiryMinutes`        | Access token lifetime (default 15)                             |
-| `Jwt:RefreshTokenExpiryDays`          | Refresh token lifetime (default 7)                             |
-| `TimeApi:BaseUrl` / `Timezone`        | External time API base + timezone (`Europe/Zurich`)            |
-| `TimeApi:TimeoutSeconds` / `RetryCount` / `CircuitBreakerThreshold` / `CircuitBreakerDurationSeconds` / `CacheTtlSeconds` | Polly + cache tuning |
-| `AttendanceRules:AutoTimeoutHours`    | Auto-close sessions open longer than this (default 16)         |
-| `UseTimeMock` / `MockTime`            | Dev/test: use a deterministic mock time source                 |
-| `VITE_API_URL` (frontend)             | API base URL for the React app                                 |
+| Feature | Employee | Manager | Admin |
+|---------|:--------:|:-------:|:-----:|
+| Clock in / out (self) | ✅ | ✅ | ✅ |
+| View own status & history | ✅ | ✅ | ✅ |
+| View another employee's history (`?employeeId=`) | ❌ (403) | ✅ | ✅ |
+| View all active sessions | ❌ | ✅ | ✅ |
+| Force clock-out another employee | ❌ | ✅ | ✅ |
+| List all employees | ❌ | ✅ | ✅ |
+| Manually correct a log | ❌ | ❌ | ✅ |
+| Create employee / change role / (de)activate | ❌ | ❌ | ✅ |
 
-> In production set the JWT secret out of source control:
-> `dotnet user-secrets set "Jwt:Secret" "<32+ char secret>" --project AttendanceSystem.Api`
+The frontend `ProtectedRoute` mirrors this for navigation; the **authoritative** check is server-side.
 
 ## Design Decisions
 
-- **All times stored as UTC `DATETIMEOFFSET(7)`.** Arithmetic (durations, auto-timeout) is then
-  DST-safe; "midnight crossing" and Zurich wall-clock display are computed at the edges via the
-  `Europe/Zurich` zone. A short 22:45→06:30 shift is flagged `crossesMidnight`.
 - **External time API is the only clock source.** Attendance is a compliance record; trusting the
-  server/browser clock would let it drift or be tampered with. `DateTime.UtcNow` is used only for
-  non-attendance concerns (token lifetimes, audit `ChangedAt`, the cosmetic live UI clock).
-- **No silent fallback.** If the time API is down, clock-in/out returns **503** (with `Retry-After`)
-  — it never substitutes server time.
-- **Circuit breaker + retry + timeout (Polly).** The time API is a hard dependency on the hot path;
-  the breaker fails fast during an outage instead of piling up slow calls, and a 5s cache keeps
-  bursts cheap without changing the source of truth.
-- **One active session per employee** is enforced both in the handler (idempotency check) and by a
-  unique filtered index `UX_OneActiveSession (EmployeeId WHERE ClockOutUtc IS NULL)` as a
-  race-condition backstop; the concurrent loser surfaces as HTTP 409.
-- **Refresh tokens are stored hashed and rotated** on every refresh (old token invalidated).
-- **Tokens live only in memory on the client** (Zustand, not localStorage) to limit XSS exposure.
-- **Soft delete via `IsActive`** + global query filter; the auto-timeout job intentionally ignores
-  `IsActive` so a deactivated employee's open session is still closed.
+  server/browser clock would let it drift or be tampered with. (Currently `timeapi.io`; the client
+  parses both offset-qualified and zone+local response shapes.)
+- **No silent fallback.** If the time source is down, clock-in/out returns **503** with a
+  `Retry-After` header — it never substitutes server time, and no record is written.
+- **All timestamps stored as UTC-anchored `DATETIMEOFFSET(7)`.** Offset-bearing instants make
+  duration math DST-safe; Europe/Zurich wall-clock is rendered only for display.
+- **Circuit breaker + retry + timeout (Polly).** The time API is a hot-path dependency; the breaker
+  fails fast during an outage instead of piling up slow calls.
+- **One active session per employee**, enforced in the handler *and* by a unique filtered index
+  (`UX_OneActiveSession`) as a race-condition backstop → 409.
+- **JWT in memory (not localStorage).** Short-lived access tokens + rotating, hashed refresh tokens
+  limit the blast radius of an XSS or a stolen token.
+- **Every mutation is audited.** Clock-in/out, auto-timeout, manual corrections, and all employee
+  management actions write before/after snapshots to `AuditLogs`.
 
-## Background Jobs
+## Project Structure
 
-- **`OpenSessionTimeoutJob`** (hosted service) runs hourly and auto-closes any session open longer
-  than `AttendanceRules:AutoTimeoutHours`, setting `IsAutoTimeout = true` and writing an audit entry.
-
-## Build & Test
-
-```bash
-dotnet build                                   # whole solution
-dotnet test                                    # unit + integration tests
-cd attendance-frontend && npm run build        # frontend production build
 ```
-
-Integration tests use `WebApplicationFactory<Program>` against a real SQL Server. They run
-against **LocalDB** by default and skip automatically if no SQL Server is reachable; set
-`ATTENDANCE_TEST_CONNECTION` to point them at a Testcontainers MsSql instance in CI.
-
-## Known Limitations & Future Improvements
-
-- **Admin "force clock-out"** is wired in the UI but has no backend endpoint yet (clock-out derives
-  the employee from the caller's JWT). Adding an admin command + endpoint is the next step.
-- **Per-punch notes** are accepted/validated but not persisted (the domain has no notes field on a
-  punch, only `CorrectionNotes`).
-- **Admin dashboard cards** show only what the API exposes (clocked-in count, avg active duration);
-  total-employee and historical-average metrics need dedicated endpoints.
-- **Token expiry vs. clock skew:** `ClockSkew = 0` means tokens expire exactly at `exp`; clients
-  should refresh proactively.
-- Running on the .NET 9 SDK requires the .NET 8 runtime (or roll-forward) since the API targets `net8.0`.
+AttendanceSystem/
+├─ AttendanceSystem.Domain/          # Entities, value objects, domain exceptions (zero dependencies)
+├─ AttendanceSystem.Application/     # CQRS commands/queries, interfaces, behaviors, validators
+├─ AttendanceSystem.Infrastructure/  # EF Core, repositories, Unit of Work, time service, background job
+├─ AttendanceSystem.Api/             # Controllers, JWT, middleware, rate limiting, health checks, DI root
+├─ AttendanceSystem.UnitTests/       # Fast in-memory tests (domain + handlers, mocked)
+├─ AttendanceSystem.IntegrationTests/# End-to-end tests over a real SQL Server (WebApplicationFactory)
+├─ attendance-frontend/              # React + Vite + TypeScript SPA
+│  └─ src/
+│     ├─ api/                        # Axios client + per-resource API modules
+│     ├─ components/                 # ClockButton, AttendanceHistory, AdminDashboard, UserManagement, common
+│     ├─ hooks/                      # useAttendance, useAuth, useCurrentTime, useNetworkStatus
+│     ├─ pages/                      # Login, Dashboard, History, Admin, UserManagement
+│     ├─ store/                      # Zustand stores (auth, toasts)
+│     ├─ types/ utils/               # Shared types and helpers
+│     └─ index.css                   # Design system (dark, Inter, sidebar layout)
+├─ docker-compose.yml                # SQL Server 2022
+├─ README.md
+└─ PROJECT_EXPLAINED.md              # Full architectural deep-dive
+```

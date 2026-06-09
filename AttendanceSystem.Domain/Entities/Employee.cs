@@ -46,6 +46,13 @@ public class Employee
     public void Deactivate() { IsActive = false; LastModifiedAt = DateTimeOffset.UtcNow; }
     public void Activate()   { IsActive = true;  LastModifiedAt = DateTimeOffset.UtcNow; }
 
+    public void ChangeRole(string role)
+    {
+        if (string.IsNullOrWhiteSpace(role)) throw new ArgumentException("Role is required", nameof(role));
+        Role = role;
+        LastModifiedAt = DateTimeOffset.UtcNow;
+    }
+
     public void UpdateRefreshToken(string token, DateTimeOffset expiry)
     {
         RefreshToken = token;

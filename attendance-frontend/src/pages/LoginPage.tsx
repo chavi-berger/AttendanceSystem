@@ -33,11 +33,11 @@ export function LoginPage() {
   return (
     <div className="login-page">
       <form className="login-card" onSubmit={handleSubmit}>
-        <h1>Attendance System</h1>
+        <div className="login-title">Attendance System</div>
         <p className="login-sub">Sign in to clock in and out.</p>
 
-        <label>
-          Email
+        <div className="field">
+          <span className="field-label">Email</span>
           <input
             type="email"
             value={email}
@@ -46,9 +46,9 @@ export function LoginPage() {
             autoComplete="username"
             required
           />
-        </label>
-        <label>
-          Password
+        </div>
+        <div className="field">
+          <span className="field-label">Password</span>
           <input
             type="password"
             value={password}
@@ -57,11 +57,11 @@ export function LoginPage() {
             autoComplete="current-password"
             required
           />
-        </label>
+        </div>
 
         <ErrorMessage message={error} />
 
-        <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
+        <button type="submit" className="btn btn-primary btn-block" disabled={loading} style={{ marginTop: 8 }}>
           {loading ? <LoadingSpinner size={18} /> : 'Sign in'}
         </button>
       </form>
